@@ -2,6 +2,7 @@ const express = require("express");
 const  mongoose = require("mongoose");
 const {userModel,todoModel} = require("./db")
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 
 const app = express();
 const jwt_secrete = "sujit1589"
@@ -15,7 +16,9 @@ async function dbConnect(){
     console.log(e);
     }
 }
+
 dbConnect();
+
 // create a middleware from authentication
 function auth(req,res,next){
 
@@ -38,10 +41,6 @@ function auth(req,res,next){
         }
 }
 
-
-
-
-
 // to parse json data form body use express.json() middleware
 app.use(express.json());
 
@@ -50,11 +49,12 @@ app.post("/sign-up",async function(req,res){
     const email = req.body.email;
     const password = req.body.password;
     const name = req.body.name;
+
+    const hashedPassword = await bcrypt.hash(password,10);
     await userModel.create({
         email       : email,
-        password    : password,
+        password    : hashedPassword,
         name        : name, 
-        token       : ""
     })
     res.status(200).send("Your account is created");
 });
@@ -63,14 +63,25 @@ app.post("/sign-in",async function(req,res){
     // take username and password from body 
     const email = req.body.email;
     const password = req.body.password;
+
     // check if user exist
     const user = await userModel.findOne({
-        email       : email,
-        password    : password
+        email       : email
     });
+
+    if(!user){
+        res.status(404).json({
+            msg:"User not found"
+        })
+        return;
+    }
     // if user present then create a token and return it
-    console.log(user);
-    if(user){
+
+    const isUser = await bcrypt.compare(password,user.password);
+
+
+   
+    if(isUser){
         const token = jwt.sign( {userId : user._id } , jwt_secrete);
         console.log(token);
 
