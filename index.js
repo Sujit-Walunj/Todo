@@ -3,9 +3,9 @@ const  mongoose = require("mongoose");
 const {userModel,todoModel} = require("./db")
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
-
+const {z} = require("zod");
 const app = express();
-const jwt_secrete = "sujit1589"
+const jwt_secrete = "sujit1589";
 
 
 async function dbConnect(){
@@ -45,17 +45,50 @@ function auth(req,res,next){
 app.use(express.json());
 
 app.post("/sign-up",async function(req,res){
+
+    // input validation
+
+        // create schema 
+        const requiredBody = z.object({
+            email       : z.string().email(),
+            password    : z.string().min(6).max(10),
+            name        : z.string().min(4).max(20)
+        })
+
+        const data = requiredBody.safeParse(req.body);
+        if(!data.success){
+            res.json({
+                msg: data.error
+            });
+            return ;
+        }
+
     // get email password and name from req body
     const email = req.body.email;
     const password = req.body.password;
     const name = req.body.name;
 
     const hashedPassword = await bcrypt.hash(password,10);
-    await userModel.create({
+   try{
+        await userModel.create({
         email       : email,
         password    : hashedPassword,
         name        : name, 
-    })
+    })}
+    catch(e){
+        if(e.errorResponse.code == 11000){
+            res.status(403).json({
+                msg :"Email address already exists"
+        })
+            return;
+        }
+        res.status(503).json({
+            msg:"error in db entry",
+            error : e
+        })
+        return;
+    }
+
     res.status(200).send("Your account is created");
 });
 
@@ -63,6 +96,20 @@ app.post("/sign-in",async function(req,res){
     // take username and password from body 
     const email = req.body.email;
     const password = req.body.password;
+
+    const credentials =z.object( {
+        email       : z.string().email(),
+        password    : z.string().min(6).max(10)
+    })
+
+    const data = credentials.safeParse(req.body);
+
+    if(!data.success){
+        res.json({
+            msg:data.error
+        })
+        return;
+    }
 
     // check if user exist
     const user = await userModel.findOne({
@@ -77,7 +124,7 @@ app.post("/sign-in",async function(req,res){
     }
     // if user present then create a token and return it
 
-    const isUser = await bcrypt.compare(password,user.password);
+    const isUser =  bcrypt.compare(password,user.password);
 
 
    
@@ -101,6 +148,22 @@ app.post("/sign-in",async function(req,res){
 });
 
 app.post("/todo",auth,async function(req,res){
+
+
+    const tododata =z.object( {
+        title: z.string().min(2).max(50),
+        description:z.string().max(200)
+    })
+
+    const data  = tododata.safeParse(req.body);
+    
+    if(!data.success){
+        res.json({
+            msg: data.error
+        });
+        return ;
+
+    }
 
     // get userId form body
         const userId = req.body.userId;

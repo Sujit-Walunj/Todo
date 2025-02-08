@@ -3,7 +3,7 @@ const Schema = mongoose.Schema; // mongoose library have a class named schema wh
 const ObjectId= mongoose.ObjectId;
 // create a schema
 const userSchema = new Schema({
-    email     : String,
+    email     : {type :String, unique : true},
     password  : String,
     name      : String
 });
